@@ -61,16 +61,6 @@ architecture Behavioral of morse_top is
     signal display_data : std_logic_vector(255 downto 0);
     signal char_count   : std_logic_vector(5 downto 0);
 
-    -- UART transmitter
-    signal bt_tx       : std_logic;
-    signal bt_tx_start : std_logic := '0';
-    signal bt_tx_data  : std_logic_vector(7 downto 0) := x"20";
-    signal bt_tx_busy  : std_logic;
-
-    -- UART transmission control
-    signal uart_pending      : std_logic := '0';
-    signal uart_pending_data : std_logic_vector(7 downto 0) := x"20";
-
     -- LED debugging
     signal led_reg : std_logic_vector(15 downto 0) :=
         (others => '0');
@@ -227,64 +217,7 @@ begin
             lcd_rs       => lcd_rs,
             lcd_e        => lcd_e
         );
-
-
-    ----------------------------------------------------------------
-    -- UART TRANSMITTER
-    -- 50 MHz clock, 9600 baud
-    ----------------------------------------------------------------
-
-    U_BT_UART_TX : entity work.uart_tx
-        generic map (
-            CLK_FREQ  => 50000000,
-            BAUD_RATE => 9600
-        )
-        port map (
-            clk      => clk,
-            tx_start => bt_tx_start,
-            tx_data  => bt_tx_data,
-            tx       => bt_tx,
-            tx_busy  => bt_tx_busy
-        );
-
-
-    ----------------------------------------------------------------
-    -- UART CHARACTER QUEUE
-    --
-    -- Send each decoded character once the UART is available.
-    -- A pending register stores a character if the UART is busy.
-    ----------------------------------------------------------------
-
-    process(clk)
-    begin
-        if rising_edge(clk) then
-
-            -- Default: do not start a new transmission.
-            bt_tx_start <= '0';
-
-            -- Capture a new decoded character.
-            if char_valid_d = '1' then
-                uart_pending_data <= char_d;
-                uart_pending      <= '1';
-            end if;
-
-            -- Transmit when a character is pending and UART is idle.
-            if uart_pending = '1' and bt_tx_busy = '0' then
-                bt_tx_data  <= uart_pending_data;
-                bt_tx_start <= '1';
-                uart_pending <= '0';
-            end if;
-
-            -- Send a space to the phone when SPACE is pressed.
-            if space_pulse = '1' then
-                uart_pending_data <= x"20";
-                uart_pending      <= '1';
-            end if;
-
-        end if;
-    end process;
-
-
+  
     ----------------------------------------------------------------
     -- LED DEBUGGING
     ----------------------------------------------------------------
@@ -311,7 +244,7 @@ begin
             led_reg(12) <= morse_code(5);
             led_reg(13) <= morse_code(6);
             led_reg(14) <= morse_code(7);
-            led_reg(15) <= bt_tx_busy;
+            led_reg(15) <= char_valid_d;
 
         end if;
     end process;
